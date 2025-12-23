@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rivista IL CAMALEONTE</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Aggiunto Bebas Neue, Playfair Display e Open Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;500;700;800;900&family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Open+Sans:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Nota: Assicurati che questi file siano nella stessa cartella -->
+    <script src="jquery.min.js"></script>
+    <script src="turn.min.js"></script>
+
+    <style>
+        body { 
+            background-color: #2e2e2e; 
+            margin: 0; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+            font-family: 'Montserrat', sans-serif; 
+        }
+
+        #flipbook { 
+            width: 960px; 
+            height: 680px; 
+            display: none; 
+        }
+
+        .page { 
+            background-color: white; 
+            position: relative; 
+        }
+
+        .hard { 
+            border: 1px solid #444; 
+            box-shadow: 0 0 5px rgba(0,0,0,0.5); 
+        }
+
+        /* NUOVO CONTENITORE SFONDO PER GESTIRE I FILTRI */
+        .page-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 1; /* Sta sotto a tutto il resto */
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2); /* Ombra interna pagina */
+        }
+
+        /* --- DARK CURTAIN REVEAL --- */
+        .curtain-base {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 0%; 
+            z-index: 5; 
+            transition: width 1.2s ease-out; 
+            pointer-events: none; 
+        }
+
+        .curtain-base.active {
+            width: 50%; 
+        }
+
+        .curtain-left {
+            left: 0;
+            background: linear-gradient(to right, rgba(0,0,0,0.6), transparent);
+        }
+
+        .curtain-right {
+            right: 0;
+            left: auto;
+            background: linear-gradient(to left, rgba(0,0,0,0.6), transparent);
+        }
+
+        /* EFFETTO PULSAZIONE COLORE */
+        @keyframes colorPulse {
+            0% { filter: brightness(100%) saturate(100%) hue-rotate(0deg); }
+            50% { filter: brightness(108%) saturate(130%) hue-rotate(5deg); }
+            100% { filter: brightness(100%) saturate(100%) hue-rotate(0deg); }
+        }
+
+        .img-color-pulse {
+            animation: colorPulse 4s infinite ease-in-out;
+        }
+
+        .gradient-shadow {
+            position: absolute; top: 0; width: 25px; height: 100%;
+            z-index: 20; pointer-events: none; 
+            opacity: 0.5; 
+        }
+
+        .video-container { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: black; z-index: 5;
+        }
+        .video-full { width: 100%; height: 100%; object-fit: cover; }
+
+        .hotspot { 
+            position: absolute; z-index: 30; cursor: pointer; 
+            background-color: transparent; border: none; 
+        }
+
+        /* STILE NUMERAZIONE PAGINA */
+        .page-number {
+            position: absolute;
+            bottom: 15px;
+            font-size: 15px; 
+            font-weight: 800; 
+            color: #333; 
+            z-index: 60;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 2px 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3); 
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* STILE BADGE CAPITOLO */
+        .chapter-badge {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333; 
+            color: #fff;
+            padding: 4px 20px; 
+            border-bottom-left-radius: 6px; 
+            border-bottom-right-radius: 6px;
+            font-size: 12px; 
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-style: italic; 
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            z-index: 55;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            white-space: nowrap;
+        }
+
+        /* CONTENITORI DI TESTO */
+        .typewriter-box, .static-content-box {
+            position: absolute;
+            z-index: 100; 
+            overflow: visible; 
+            height: auto !important; 
+            font-family: 'Montserrat', sans-serif; 
+            line-height: 1.5; 
+            white-space: pre-wrap; 
+            pointer-events: none;  
+        }
+
+        /* STILE TITOLO INDICE */
+        .titolo-indice {
+            font-family: 'Arial', 'Helvetica', sans-serif !important; 
+            color: #ffcc00 !important; 
+            -webkit-text-stroke: 1.5px black; 
+            text-shadow: 4px 4px 6px rgba(0, 0, 0, 0.4) !important; 
+            letter-spacing: 2px;
+        }
+
+        /* STILE RIFLESSO DINAMICO */
+        .riflesso-container {
+            font-family: 'Montserrat', sans-serif;
+            text-align: left;
+            margin-bottom: 50px; 
+        }
+
+        .riflesso-container span {
+            display: block;
+            font-size: 20px;
+            font-weight: 400;
+            color: #555;
+            text-transform: none;
+            margin-bottom: 5px;
+        }
+
+        .riflesso-container h2 {
+            font-size: 48px;
+            font-weight: 800;
+            color: #a64ca6; 
+            text-transform: uppercase;
+            margin: 0;
+            padding: 0;
+            line-height: 1.1;
+            -webkit-box-reflect: below -15px linear-gradient(to bottom, rgba(0,0,0,0) 20%, rgba(0,0,0,0.2) 100%);
+        }
+
+        /* STILE TITOLO RIFLESSO */
+        .titolo-riflesso {
+            color: #a64ca6; 
+            text-transform: uppercase; 
+            font-weight: 700; 
+            font-size: 45px;
+            line-height: 1.2;
+            -webkit-box-reflect: below -10px linear-gradient(to bottom, rgba(0,0,0,0.0), rgba(0,0,0,0.25));
+        }
+
+        .titolo-riflesso span {
+            display: block;
+            font-size: 0.5em; 
+            text-transform: none; 
+            font-weight: 400;
+            color: #555; 
+            margin-bottom: 5px;
+        }
+
+        /* EFFETTI CRISTALLO TESTO (SHINE BASE) */
+        .shine-base {
+            background-size: 200% auto;
+            color: transparent !important; 
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3s linear 1 forwards;
+            filter: 
+                drop-shadow(1px 1px 0px rgba(0,0,0,1)) 
+                drop-shadow(0px 0px 4px rgba(0,0,0,0.8));
+        }
+
+        @keyframes shineMove {
+            0% { background-position: 200% center; }
+            100% { background-position: 0% center; }
+        }
+
+        /* GEMME E ALTRI EFFETTI */
+        .shine-blue { background-image: linear-gradient(110deg, #0d47a1 0%, #2196f3 30%, #ffffff 50%, #2196f3 70%, #0d47a1 100%); }
+        .shine-gold { background-image: linear-gradient(110deg, #b8860b 0%, #ffc107 30%, #ffffff 50%, #ffc107 70%, #b8860b 100%); }
+        .shine-red { background-image: linear-gradient(110deg, #8b0000 0%, #ff1744 30%, #ffffff 50%, #ff1744 70%, #8b0000 100%); }
+        .shine-green { background-image: linear-gradient(110deg, #004d40 0%, #00e676 30%, #ffffff 50%, #00e676 70%, #004d40 100%); }
+        .shine-silver { background-image: linear-gradient(110deg, #212121 0%, #9e9e9e 30%, #ffffff 50%, #9e9e9e 70%, #212121 100%); }
+        .shine-purple { background-image: linear-gradient(110deg, #311b92 0%, #ab47bc 30%, #ffffff 50%, #ab47bc 70%, #311b92 100%); }
+        .shine-magenta { background-image: linear-gradient(110deg, #aa00ff 0%, #ea00ff 30%, #ffffff 50%, #ea00ff 70%, #aa00ff 100%); }
+        .shine-index-list { background-image: linear-gradient(110deg, #9A7D0A 0%, #F1C40F 30%, #FFFFE0 50%, #F1C40F 70%, #9A7D0A 100%); }
+        
+        .shine-gold-warm { background-image: linear-gradient(110deg, #FFD700 0%, #FFCC00 30%, #FFFFE0 50%, #FFCC00 70%, #FFD700 100%); }
+        .shine-orange-bright { background-image: linear-gradient(110deg, #F57C00 0%, #FF9800 30%, #FFE0B2 50%, #FF9800 70%, #F57C00 100%); }
+
+        /* CYBER SECURITY */
+        .cyber-blue-title {
+            color: #00ffff !important; 
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.9), 0 0 20px rgba(0, 100, 255, 0.6) !important;
+        }
+
+        .cyber-blue-text {
+            color: #e0f7fa !important; 
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.6) !important;
+        }
+
+        /* SHINE CASCADE BLUE */
+        .shine-cascade-blue {
+            background-image: linear-gradient(
+                110deg, 
+                #0099cc 0%,      
+                #00d4ff 30%,     
+                #ffcc66 50%,     
+                #00d4ff 70%,     
+                #0099cc 100%     
+            );
+            background-size: 200% auto;
+            color: transparent !important; 
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3s linear 1 forwards;
+            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.8));
+        }
+
+        /* SHINE HOLOGRAM PEARL */
+        .shine-hologram-pearl {
+            background-image: linear-gradient(
+                135deg,
+                #9b8fb5 0%,      
+                #d0dae3 25%,     
+                #ffffff 50%,     
+                #ffcc66 55%,     
+                #d0dae3 75%,     
+                #7c6b8f 100%     
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 4s linear 1 forwards;
+            filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.7));
+        }
+
+        /* STILE PER PAGINA 21 (HOLOGRAM IMPACT) */
+        .shine-hologram-impact {
+            background-image: linear-gradient(
+                120deg,
+                #0099ff 0%,
+                #00ccff 25%,
+                #ffffff 45%,     /* Flash bianco */
+                #ff6633 50%,     /* Accento arancio */
+                #ffffff 55%,
+                #33ddff 75%,
+                #0099ff 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 4s linear 1 forwards;
+            filter: drop-shadow(0 0 10px rgba(0, 204, 255, 0.8));
+        }
+
+        /* STILE PER PAGINA 22 (DIGITAL HANDSHAKE) */
+        .shine-digital-handshake {
+            background-image: linear-gradient(
+                110deg,
+                #0066ff 0%,
+                #0088ff 20%,
+                #00ddff 40%,
+                #ffffff 50%,     /* Centro bianco puro */
+                #00ffff 60%,
+                #33ccff 80%,
+                #0066ff 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3s linear 1 forwards;
+            filter: drop-shadow(0 0 12px rgba(0, 255, 255, 0.9));
+        }
+
+        /* STILE PER PAGINA 23 (RAINBOW NEON) */
+        .shine-rainbow-neon {
+            background-image: linear-gradient(
+                90deg,
+                #ff9933 0%,      /* Arancio */
+                #ffcc66 15%,
+                #00ff66 30%,     /* Verde */
+                #33ff88 45%,
+                #ffffff 50%,     /* Flash bianco */
+                #0099ff 55%,     /* Blu */
+                #00ccff 70%,
+                #ff0099 85%,     /* Rosa */
+                #ff33bb 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 6s linear 1 forwards;
+            filter: drop-shadow(0 0 15px rgba(255, 204, 102, 0.9));
+        }
+
+        /* --- NUOVO: STILE PER PAGINA 24 (WARNING RED) --- */
+        .shine-warning-red {
+            background-image: linear-gradient(
+                110deg,
+                #cc0000 0%,      /* Rosso scuro */
+                #ff0000 25%,     /* Rosso puro */
+                #ff6666 45%,
+                #ffffff 50%,     /* Flash bianco allarme */
+                #ff6666 55%,
+                #ff3333 75%,
+                #cc0000 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 2.5s linear 1 forwards;
+            filter: drop-shadow(0 0 12px rgba(255, 51, 51, 0.9));
+        }
+
+        /* --- NUOVO: STILE PER PAGINA 25 (GLASS DOMINO) --- */
+        .shine-glass-domino {
+            background-image: linear-gradient(
+                135deg,
+                #002b4d 0%,      /* Blu notte */
+                #66b3ff 25%,     /* Blu ghiaccio */
+                #cce6ff 40%,
+                #ffffff 50%,     /* Centro cristallino */
+                #ffaa33 55%,     /* Flash oro */
+                #80c4ff 70%,
+                #001a33 100%     /* Blu profondo */
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 4s linear 1 forwards;
+            filter: drop-shadow(0 0 10px rgba(102, 179, 255, 0.8));
+        }
+
+        /* --- NUOVI STILI PER PAGINE 26-39 --- */
+
+        /* Pg 27/29: LATO OSCURO/ODIO (Rosso sangue/nero) */
+        .shine-dark-side {
+            background-image: linear-gradient(135deg, #000000 0%, #800000 30%, #ff0000 50%, #800000 70%, #000000 100%);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 5s linear 1 forwards;
+            filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.8));
+        }
+
+        /* Pg 30: FAKE NEWS (Giallo/Nero cantiere) */
+        .shine-warning-stripe {
+            background-image: repeating-linear-gradient(45deg, #ffcc00, #ffcc00 10px, #000000 10px, #000000 20px);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 4s linear infinite;
+            filter: drop-shadow(2px 2px 0px #000);
+        }
+
+        /* Pg 31: PHISHING (Viola/Arancio ingannevole) */
+        .shine-phishing {
+            background-image: linear-gradient(110deg, #4a148c 0%, #ff6f00 50%, #4a148c 100%);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3s linear 1 forwards;
+            filter: drop-shadow(0 0 5px rgba(255, 111, 0, 0.8));
+        }
+
+        /* Pg 32: DIPENDENZA (Verde Matrix) */
+        .shine-matrix-green {
+            background-image: linear-gradient(180deg, #003300 0%, #00ff00 50%, #003300 100%);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 2s linear infinite;
+            text-shadow: 0 0 8px #00ff00;
+            font-family: 'Courier New', Courier, monospace !important;
+        }
+
+        /* Pg 33: SCUDO (Texture Energetica/Cyber Shield) - AGGIORNATO */
+        .shine-shield-metal {
+            background-image: linear-gradient(
+                120deg,
+                #004e92 0%,      /* Blu profondo */
+                #2b8cbe 25%,     /* Blu acciaio */
+                #a6f1ff 45%,     /* Ciano brillante */
+                #ffffff 50%,     /* Nucleo di energia */
+                #a6f1ff 55%,
+                #2b8cbe 75%,
+                #004e92 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3.5s linear 1 forwards;
+            filter: drop-shadow(0 0 10px rgba(0, 198, 255, 0.8)); /* Glow azzurro intenso */
+        }
+
+        /* Pg 35: SICUREZZA (Cyber Purple) */
+        .shine-cyber-purple {
+            background-image: linear-gradient(90deg, #7b1fa2 0%, #e040fb 50%, #00e5ff 100%);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3s linear 1 forwards;
+            filter: drop-shadow(0 0 10px rgba(224, 64, 251, 0.8));
+        }
+
+        /* Pg 36: PASSWORD (Acciaio rinforzato) */
+        .shine-steel-lock {
+            background-image: linear-gradient(110deg, #263238 0%, #78909c 30%, #ffffff 50%, #78909c 70%, #263238 100%);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3s linear 1 forwards;
+            filter: drop-shadow(1px 1px 2px black);
+        }
+
+        /* Pg 37: 2FA (Sync Blu/Verde) */
+        .shine-sync-blue {
+            background-image: linear-gradient(90deg, #0288d1 0%, #00e676 50%, #0288d1 100%);
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 4s linear infinite;
+            filter: drop-shadow(0 0 8px rgba(0, 230, 118, 0.6));
+        }
+
+        /* Pagina 28: CYBERBULLISMO (Adattato come classe wrapper) */
+        .page-28-wrapper {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #FFFFFF;
+            text-align: center;
+        }
+
+        .page-28-wrapper .background-image {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background: url('cyberbullismo-bg.jpg') no-repeat center center;
+            background-size: cover;
+            z-index: -1;
+        }
+
+        .page-28-wrapper .background-image::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(
+                ellipse at center,
+                rgba(0, 0, 0, 0) 0%,
+                rgba(0, 0, 0, 0.8) 100%
+            );
+        }
+
+        .page-28-wrapper .page-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 3.5em;
+            color: #BA68C8;
+            text-shadow:
+                2px 2px 4px rgba(0, 0, 0, 0.7),
+                -1px -1px 0 #FFFFFF;
+            margin-bottom: 20px;
+            z-index: 1; /* Assicura che stia sopra lo sfondo */
+        }
+
+        .page-28-wrapper .page-text {
+            font-family: 'Open Sans', sans-serif;
+            color: #FFFFFF;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 5px;
+            line-height: 1.6;
+            font-size: 1.1em;
+            max-width: 60%;
+            margin: 0 auto;
+            z-index: 1; /* Assicura che stia sopra lo sfondo */
+        }
+
+        /* SHINE YINYANG DUALITY */
+        .shine-yinyang-duality {
+            background-image: linear-gradient(
+                90deg,
+                #0066ff 0%,      
+                #0099ff 20%,
+                #9966ff 40%,     
+                #cc99ff 50%,     
+                #ff3355 60%,     
+                #ff0033 80%,
+                #ff6677 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 5s linear 1 forwards;
+            filter: drop-shadow(0 0 12px rgba(153, 102, 255, 0.9));
+        }
+
+        /* GLOWING SPHERE */
+        .shine-glowing-sphere {
+            background-image: linear-gradient(
+                110deg,
+                #ff6600 0%,      
+                #ff8833 25%,
+                #ffaa44 40%,
+                #ffffff 50%,     
+                #ffaa44 60%,
+                #ff8833 75%,
+                #ff6600 100%
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 3.5s linear 1 forwards;
+            filter: drop-shadow(0 0 15px rgba(255, 136, 51, 0.9));
+        }
+
+        /* EFFETTO CRYSTAL SFACCETTATO */
+        .crystal-title {
+            background-image: linear-gradient(
+                135deg, 
+                #ffffff 0%, #ffffff 10%, 
+                #8e24aa 10%, #8e24aa 25%, 
+                #d1c4e9 25%, #d1c4e9 30%, 
+                #4a148c 30%, #4a148c 50%, 
+                #ffffff 50%, #ffffff 55%, 
+                #ab47bc 55%, #ab47bc 70%, 
+                #4a148c 70%, #4a148c 100% 
+            );
+            background-size: 200% auto;
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shineMove 6s linear infinite; 
+            filter: 
+                drop-shadow(1px 1px 0px rgba(255,255,255,0.5)) 
+                drop-shadow(3px 3px 2px rgba(0,0,0,0.6));
+        }
+
+        /* AMETISTA/CRYSTAL */
+        .crystal-amethyst-title {
+            background-image: linear-gradient(to bottom, #d1c4e9 0%, #9c27b0 50%, #4a148c 100%);
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 
+                -1px -1px 0 rgba(255,255,255,0.4),
+                1px 1px 0 #2a003e,
+                2px 2px 0 #2a003e,
+                4px 4px 4px rgba(0,0,0,0.7) !important; 
+            letter-spacing: 1px;
+        }
+
+        .crystal-amethyst-text {
+            background-image: linear-gradient(180deg, #e1bee7 0%, #ce93d8 50%, #ba68c8 100%); 
+            color: transparent !important;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.8));
+        }
+
+        .cursor::after {
+            content: '|';
+            animation: blink 1s step-start infinite;
+            color: #fff; 
+            text-shadow: 0 0 2px black;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .back-cover-style { 
+            background-color: #1a1a1a; 
+            display: flex; justify-content: center; align-items: center; 
+            color: #555; font-size: 14px; border-left: 2px solid #333; 
+        }
+    </style>
+</head>
+<body>
+
+    <div id="flipbook"></div>
+
+    <script>
+        const pages = [];
+        for (let i = 1; i <= 48; i++) { pages.push(i + '.png'); }
+
+        const videos = [];
+
+        const links = [
+            { pageIndex: 2, destPage: 3, top: 25, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 5, top: 33, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 12, top: 41, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 20, top: 49, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 27, top: 57, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 35, top: 65, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 41, top: 73, left: 10, width: 80, height: 6 },
+            { pageIndex: 2, destPage: 46, top: 81, left: 10, width: 80, height: 6 }
+        ];
+
+        const chapters = [
+            { start: 3, end: 4, title: "INTRODUZIONE", color: "#444444" },
+            { start: 5, end: 11, title: "IDENTITÀ DIGITALE", color: "#3498db" }, 
+            { start: 12, end: 19, title: "DIRITTI DIGITALI", color: "#f39c12" }, 
+            { start: 20, end: 26, title: "DOVERI E RESPONSABILITÀ", color: "#e67e22" }, 
+            { start: 27, end: 34, title: "RISCHI DEL DIGITALE", color: "#c0392b" }, 
+            { start: 35, end: 40, title: "SICUREZZA DIGITALE", color: "#8e44ad" }, 
+            { start: 41, end: 47, title: "EDUCAZIONE DIGITALE", color: "#27ae60" } 
+        ];
+
+        const texts = [
+            // PAGINA 2: INDICE
+            {
+                pageIndex: 2, content: "INDICE",
+                speed: 15, top: 10, left: 10, width: 80, 
+                fontSize: '50px', fontWeight: '800',
+                effect: 'titolo-indice' 
+            },
+            {
+                pageIndex: 2, 
+                content: "0. Apertura\n\n1. Identità Digitale\n\n2. Diritti Digitali\n\n3. Doveri e Responsabilità\n\n4. Rischi del Digitale\n\n5. Sicurezza Digitale\n\n6. Educazione Digitale\n\n7. Chiusura",
+                speed: 10, top: 25, left: 10, width: 80, height: 70, 
+                color: '#ffffff', fontSize: '20px', fontWeight: '500',
+                effect: 'shine-index-list' 
+            },
+            // PAGINA 3
+            {
+                pageIndex: 3, 
+                top: 15, left: 10, width: 85,
+                htmlContent: `<div class="riflesso-container"><span>Cosa significa essere</span><h2>CITTADINI DIGITALI?</h2></div>`
+            },
+            {
+                pageIndex: 3, 
+                content: "Non è solo usare internet.\nÈ la capacità di avvalersi dei media digitali in modo responsabile, efficace e critico.",
+                speed: 10, top: 65, left: 10, width: 80, 
+                color: '#000000', fontSize: '20px', fontWeight: '500'
+            },
+            // PAGINA 4
+            {
+                pageIndex: 4, content: "PERCHÉ OGGI?",
+                speed: 15, top: 15, left: 10, width: 40,
+                color: '#ff4444', fontSize: '32px', fontWeight: '800'
+            },
+            {
+                pageIndex: 4,
+                content: "• TECNOLOGIA\nÈ ormai ovunque.\n\n• SOCIETÀ\nLe relazioni passano da qui.\n\n• SCUOLA\nIl futuro del lavoro inizia online.",
+                speed: 10, top: 30, left: 10, width: 45,
+                color: '#ffffff', fontSize: '18px', fontWeight: '500'
+            },
+            // PAGINA 5
+            {
+                pageIndex: 5, content: "L'IDENTITÀ\nDIGITALE",
+                speed: 15, top: 10, left: 5, width: 90,
+                fontSize: '48px', fontWeight: '800', 
+                effect: 'crystal-title', 
+                lineHeight: '1.1'
+            },
+            {
+                pageIndex: 5,
+                content: "Chi sei veramente quando sei online?\n\nNon è solo il tuo nome utente.\nÈ l'insieme di dati, tracce e azioni che ti rappresentano nel mondo virtuale.",
+                speed: 10, top: 35, left: 5, width: 50, 
+                color: '#e67e55', 
+                fontSize: '20px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif" 
+            },
+            // PAGINA 6
+            {
+                pageIndex: 6, content: "I TUOI VOLTI ONLINE",
+                speed: 15, top: 15, left: 55, width: 40, 
+                color: '#f1c40f', fontSize: '32px', fontWeight: '800',
+                textAlign: 'left' 
+            },
+            {
+                pageIndex: 6,
+                content: "• Profili Social\n• Account di Gioco\n• Email e Chat\n\nOgni piattaforma mostra un pezzo diverso di te.",
+                speed: 10, top: 30, left: 55, width: 40, 
+                color: '#ffffff', fontSize: '20px', fontWeight: '500', 
+                textAlign: 'left' 
+            },
+            // PAGINA 7
+            {
+                pageIndex: 7, content: "LA TUA SCIA\nDIGITALE",
+                speed: 20, top: 15, left: 10, width: 80,
+                color: '#e74c3c', fontSize: '40px', fontWeight: '800',
+                textAlign: 'center' 
+            },
+            {
+                pageIndex: 7,
+                content: "Ogni like, ogni commento, ogni click lascia un'impronta.\n\nLa tua reputazione si costruisce (o si distrugge) un post alla volta.",
+                speed: 10, top: 40, left: 10, width: 80,
+                color: '#ffffff', fontSize: '24px', fontWeight: '500',
+                textAlign: 'center' 
+            },
+            // PAGINA 8
+            {
+                pageIndex: 8, content: "LO SPECCHIO\nVIRTUALE",
+                speed: 15, top: 10, left: 10, width: 100,
+                color: '#9b59b6', fontSize: '36px', fontWeight: '800', textAlign: 'center' 
+            },
+            {
+                pageIndex: 8,
+                content: "Quanto conta l'apparenza?\nFoto filtrate e vite perfette spesso non raccontano la verità.",
+                speed: 10, top: 80, left: 10, width: 80,
+                color: '#ffffff', fontSize: '20px', fontWeight: '500'
+            },
+            // PAGINA 9
+            {
+                pageIndex: 9, content: "INTERNET NON DIMENTICA",
+                speed: 25, top: 15, left: 10, width: 80,
+                color: '#00FFFF', fontSize: '30px', fontWeight: '800', textAlign: 'center' 
+            },
+            {
+                pageIndex: 9,
+                content: "Ciò che pubblichi oggi potrebbe essere visto tra 10 anni.\nDa un amico, da un professore, da un datore di lavoro.",
+                speed: 10, top: 30, left: 15, width: 70,
+                color: '#00FFFF', fontSize: '18px', textAlign: 'center', fontWeight: '500'
+            },
+            // PAGINA 10
+            {
+                pageIndex: 10, content: "COSTRUIRE VALORE",
+                speed: 15, top: 10, left: 10, width: 60,
+                color: '#ffcc00', fontSize: '32px', fontWeight: '800', 
+                effect: 'shine-gold-warm' 
+            },
+            {
+                pageIndex: 10,
+                content: "Usa la rete per mostrare i tuoi talenti.\nSii gentile.\nSii autentico.\nIspira gli altri.",
+                speed: 10, top: 25, left: 10, width: 50,
+                color: '#ff9800', fontSize: '22px', fontWeight: '500', 
+                effect: 'shine-orange-bright' 
+            },
+            // PAGINA 11
+            {
+                pageIndex: 11, content: "SINTESI: IDENTITÀ",
+                speed: 15, top: 5, left: 2, width: 40, 
+                fontSize: '32px', fontWeight: '900', 
+                effect: 'crystal-amethyst-title', 
+                textAlign: 'left'
+            },
+            {
+                pageIndex: 11,
+                content: "1. Online e Offline sono reali uguale.\n2. Lasci tracce ovunque.\n3. Il web ha memoria lunga.\n4. Cura la tua immagine con intelligenza.",
+                speed: 10, top: 45, left: 5, width: 40, 
+                fontSize: '22px', fontWeight: '500',
+                effect: 'crystal-amethyst-text', 
+                fontFamily: "'Open Sans', sans-serif",
+                textAlign: 'left' 
+            },
+            // PAGINA 12
+            {
+                pageIndex: 12, content: "I TUOI DIRITTI",
+                speed: 15, top: 20, left: 50, width: 45, 
+                color: '#3498db', fontSize: '40px', fontWeight: '800', textAlign: 'right'
+            },
+            {
+                pageIndex: 12,
+                content: "La cittadinanza non è fatta solo di doveri.\nEsistono leggi che ti proteggono anche nello spazio digitale.",
+                speed: 10, top: 55, left: 40, width: 55, 
+                color: '#ffffff', fontSize: '20px', textAlign: 'right', fontWeight: '500'
+            },
+            // PAGINA 13
+            {
+                pageIndex: 13, content: "PRIVACY",
+                speed: 15, top: 10, left: 5, width: 45, 
+                fontSize: '36px', fontWeight: '800',
+                effect: 'cyber-blue-title',
+                textAlign: 'left'
+            },
+            {
+                pageIndex: 13,
+                content: "I tuoi dati sono tuoi.\nNessuno dovrebbe spiare le tue conversazioni o tracciare i tuoi movimenti senza permesso.",
+                speed: 10, top: 25, left: 5, width: 45, 
+                fontSize: '20px', fontWeight: '400',
+                effect: 'cyber-blue-text',
+                fontFamily: "'Open Sans', sans-serif",
+                textAlign: 'left'
+            },
+            // PAGINA 14
+            {
+                pageIndex: 14, content: "I DATI SONO ORO",
+                speed: 15, top: 5, left: 15, width: 90,
+                color: '#ffd700', fontSize: '32px', fontWeight: '800' 
+            },
+            {
+                pageIndex: 14,
+                content: "Le aziende vogliono le tue informazioni.\nIl GDPR (legge europea) ti dà il potere di dire NO e di controllare come vengono usati i tuoi dati.",
+                speed: 10, top: 75, left: 10, width: 90,
+                color: '#cfb53b', 
+                fontSize: '18px', fontWeight: '500'
+            },
+            // PAGINA 15
+            {
+                pageIndex: 15, 
+                top: 15, left: 50, width: 45,
+                htmlContent: '<div class="titolo-riflesso" style="text-align: right; font-size: 38px; font-family: Montserrat, sans-serif; font-weight: 800; color: #a64ca6;">PAROLA LIBERA</div>'
+            },
+            {
+                pageIndex: 15,
+                content: "Hai il diritto di dire la tua.\nMa attenzione: la tua libertà finisce dove inizia la libertà (e la dignità) degli altri.",
+                speed: 10, top: 69, left: 40, width: 55,
+                fontSize: '20px', fontWeight: '400', 
+                color: '#ffffff', 
+                textAlign: 'right',
+                fontFamily: "'Open Sans', sans-serif"
+            },
+            // PAGINA 16
+            {
+                pageIndex: 16, content: "DIRITTO DI ACCESSO",
+                speed: 15, top: 15, left: 3, width: 80,
+                fontSize: '34px', fontWeight: '800',
+                effect: 'shine-cascade-blue', 
+                textAlign: 'left'
+            },
+            {
+                pageIndex: 16,
+                content: "Internet è una risorsa fondamentale.\nTutti dovrebbero poter accedere alla conoscenza, senza barriere economiche o fisiche.",
+                speed: 10, top: 25, left: 10, width: 60,
+                color: '#b3e5fc', 
+                fontSize: '20px', fontWeight: '500',
+                textShadow: '0 0 10px rgba(0, 212, 255, 0.6), 2px 2px 4px rgba(0,0,0,0.8)',
+                textAlign: 'left'
+            },
+            // PAGINA 17
+            {
+                pageIndex: 17, content: "IL DIRITTO\nALL'OBLIO",
+                speed: 15, top: 10, left: 60, width: 35,
+                fontSize: '32px', fontWeight: '800', textAlign: 'right',
+                effect: 'shine-hologram-pearl'
+            },
+            {
+                pageIndex: 17,
+                content: "Possiamo chiedere di cancellare vecchie notizie o foto che non ci rappresentano più.\nRiprendersi la propria storia.",
+                speed: 10, top: 30, left: 50, width: 45,
+                color: '#d0dae3', 
+                fontSize: '18px', textAlign: 'right', fontWeight: '500',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 18
+            {
+                pageIndex: 18, content: "DIRITTI vs DOVERI",
+                speed: 15, top: 40, left: 10, width: 80,
+                fontSize: '40px', fontWeight: '800', textAlign: 'center',
+                effect: 'shine-yinyang-duality'
+            },
+            {
+                pageIndex: 18,
+                content: "Non puoi pretendere privacy se violi quella altrui.\nLa bilancia della cittadinanza si regge sull'equilibrio.",
+                speed: 10, top: 55, left: 10, width: 80,
+                color: '#cc99ff', 
+                fontSize: '20px', textAlign: 'center', fontWeight: '500',
+                textShadow: '0 0 8px rgba(153, 102, 255, 0.8), 2px 2px 4px rgba(0,0,0,0.9)'
+            },
+            // PAGINA 19
+            {
+                pageIndex: 19, content: "SINTESI: DIRITTI",
+                speed: 15, top: 10, left: 10, width: 80,
+                color: '#ffffff', fontSize: '28px', fontWeight: '800'
+            },
+            {
+                pageIndex: 19,
+                content: "• Privacy e Dati sono sacri.\n• La parola è libera ma responsabile.\n• L'oblio permette di ricominciare.\n• L'accesso deve essere per tutti.",
+                speed: 10, top: 25, left: 10, width: 80,
+                color: '#ffffff', fontSize: '22px', fontWeight: '500'
+            },
+            // PAGINA 20
+            {
+                pageIndex: 20, content: "RESPONSABILITÀ",
+                speed: 15, top: 10, left: 10, width: 80,
+                fontSize: '40px', fontWeight: '800',
+                effect: 'shine-glowing-sphere'
+            },
+            {
+                pageIndex: 20,
+                content: "Internet non è il Far West.\nEssere cittadini digitali significa capire che ogni azione ha una conseguenza, per noi e per gli altri.",
+                speed: 10, top: 25, left: 10, width: 60,
+                color: '#ffcc88', 
+                fontSize: '20px', fontWeight: '500',
+                textShadow: '0 0 8px rgba(255, 136, 51, 0.6), 2px 2px 4px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 21: IL PESO DELLE PAROLE
+            {
+                pageIndex: 21, content: "IL PESO DELLE\nPAROLE",
+                speed: 15, top: 15, left: 50, width: 45,
+                fontSize: '36px', fontWeight: '800', textAlign: 'right',
+                effect: 'shine-hologram-impact'
+            },
+            {
+                pageIndex: 21,
+                content: "Dietro ogni schermo c'è una persona.\nNon scrivere mai ciò che non avresti il coraggio di dire guardando qualcuno negli occhi.",
+                speed: 10, top: 35, left: 40, width: 55,
+                color: '#99ddff', 
+                fontSize: '20px', textAlign: 'right', fontWeight: '500',
+                textShadow: '0 0 8px rgba(0, 204, 255, 0.7), 2px 2px 4px rgba(0,0,0,0.9)'
+            },
+            // PAGINA 22: GALATEO 2.0
+            {
+                pageIndex: 22, content: "GALATEO 2.0\n(NETIQUETTE)",
+                speed: 15, top: 10, left: 10, width: 80,
+                fontSize: '34px', fontWeight: '800',
+                effect: 'shine-digital-handshake'
+            },
+            {
+                pageIndex: 22,
+                content: "• Non usare il MAIUSCOLO (equivale a urlare).\n• Rispetta la privacy altrui.\n• Non inoltrare catene inutili.\n• Sii breve e chiaro.",
+                speed: 10, top: 65, left: 6, width: 70, 
+                color: '#99eeff', 
+                fontSize: '20px', fontWeight: '500',
+                textShadow: '0 0 6px rgba(0, 255, 255, 0.6), 1px 1px 3px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 23: REGOLE DEL GIOCO
+            {
+                pageIndex: 23, content: "LE REGOLE DEL GIOCO",
+                speed: 15, top: 75, left: 10, width: 90,
+                fontSize: '34px', fontWeight: '800',
+                effect: 'shine-rainbow-neon'
+            },
+            {
+                pageIndex: 23,
+                content: "Hai mai letto i 'Termini di Servizio'?\nOgni social ha regole precise su età minima, copyright e comportamenti vietati.",
+                speed: 10, top: 85, left: 10, width: 90,
+                color: '#ffffff', fontSize: '18px', fontWeight: '500'
+            },
+            // PAGINA 24: PRIMA DI POSTARE
+            {
+                pageIndex: 24, content: "PRIMA DI POSTARE...",
+                speed: 20, top: 10, left: 10, width: 80,
+                fontSize: '38px', fontWeight: '800',
+                effect: 'shine-warning-red'
+            },
+            {
+                pageIndex: 24,
+                content: "Fermati e rifletti:\n1. È vero?\n2. È utile?\n3. Può ferire qualcuno?\n4. Vorrei che i miei genitori lo vedessero?",
+                speed: 10, top: 60, left: 3, width: 60,
+                color: '#ffcccc', 
+                fontSize: '20px', fontWeight: '500',
+                textShadow: '0 0 8px rgba(255, 102, 102, 0.6), 2px 2px 4px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 25: ERRORI REALI
+            {
+                pageIndex: 25, content: "ERRORI REALI",
+                speed: 15, top: 10, left: 50, width: 45,
+                fontSize: '36px', fontWeight: '800', textAlign: 'right',
+                effect: 'shine-glass-domino'
+            },
+            {
+                pageIndex: 25,
+                content: "Un insulto online può portare a denunce legali.\nUna foto inappropriata può costarti un futuro lavoro.\nIl virtuale ha conseguenze reali.",
+                speed: 10, top: 35, left: 40, width: 55,
+                color: '#b3d9ff', 
+                fontSize: '20px', textAlign: 'right', fontWeight: '500',
+                textShadow: '0 0 8px rgba(102, 179, 255, 0.7), 2px 2px 4px rgba(0,0,0,0.9)'
+            },
+            // PAGINA 26: SINTESI DOVERI (Armonizzata)
+            {
+                pageIndex: 26, content: "SINTESI: DOVERI",
+                speed: 15, top: 10, left: 10, width: 80,
+                color: '#FFFFFF', fontSize: '28px', fontWeight: 'bold',
+                fontFamily: "'Bebas Neue', sans-serif",
+                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)'
+            },
+            {
+                pageIndex: 26,
+                content: "• Rispetto: la regola d'oro.\n• Netiquette: l'educazione digitale.\n• Consapevolezza: pensa prima di cliccare.\n• Legalità: il web non è zona franca.",
+                speed: 10, top: 65, left: 10, width: 80,
+                color: '#E0E0E0', fontSize: '22px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif"
+            },
+            // PAGINA 27: IL LATO OSCURO (Dark Side Effect)
+            {
+                pageIndex: 27, content: "IL LATO OSCURO",
+                speed: 20, top: 10, left: 10, width: 80,
+                fontSize: '40px', fontWeight: '800',
+                effect: 'shine-dark-side',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 27,
+                content: "Il web è una risorsa straordinaria, ma nasconde insidie.\nConoscerle è l'unico modo per evitarle.",
+                speed: 10, top: 50, left: 5, width: 30,
+                color: '#FFFFFF', fontSize: '20px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif"
+            },
+            // PAGINA 28: CYBERBULLISMO (Layout personalizzato)
+            {
+                pageIndex: 28,
+                htmlContent: `
+                    <div class="page-28-wrapper">
+                        <div class="background-image"></div>
+                        <div class="page-title">CYBERBULLISMO</div>
+                        <div class="page-text">Molestie, esclusione, diffamazione.<br>Non colpisce il corpo, ma distrugge la psiche.<br>Chi guarda e tace è complice.</div>
+                    </div>
+                `,
+                top: 0, left: 0, width: 100, height: 100
+            },
+            // PAGINA 29: ODIO ONLINE (Dark Side Effect)
+            {
+                pageIndex: 29, content: "ODIO ONLINE\n(Hate Speech)",
+                speed: 15, top: 40, left: 50, width: 45,
+                fontSize: '32px', fontWeight: '800', textAlign: 'right',
+                effect: 'shine-dark-side',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 29,
+                content: "Parole usate come armi contro chi è diverso.\nRazzismo, sessismo e intolleranza trovano eco nei social. Non amplificarli.",
+                speed: 10, top: 55, left: 40, width: 55,
+                color: '#ffffff', fontSize: '18px', textAlign: 'right', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 30: FAKE NEWS (Warning Stripe)
+            {
+                pageIndex: 30, content: "FAKE NEWS",
+                speed: 15, top: 10, left: 10, width: 80,
+                fontSize: '44px', fontWeight: '800',
+                effect: 'shine-warning-stripe',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 30,
+                content: "Notizie false create per manipolare o fare soldi.\n\nCome difendersi?\nVerifica la fonte.\nControlla la data.\nCerca conferme altrove.",
+                speed: 10, top: 25, left: 10, width: 60,
+                color: '#ffffcc', fontSize: '20px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '1px 1px 1px #000'
+            },
+            // PAGINA 31: TRUFFE E PHISHING (Phishing Effect)
+            {
+                pageIndex: 31, content: "TRUFFE E PHISHING",
+                speed: 15, top: 10, left: 10, width: 90,
+                fontSize: '36px', fontWeight: '800',
+                effect: 'shine-phishing',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 31,
+                content: "'Hai vinto un iPhone!'\n'Il tuo account è bloccato!'\n\nSono esche. Non cliccare mai su link sospetti e non dare mai la tua password.",
+                speed: 10, top: 56, left: 10, width: 80,
+                color: '#e1bee7', fontSize: '20px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 32: DIPENDENZA DIGITALE (Matrix Green)
+            {
+                pageIndex: 32, content: "DIPENDENZA\nDIGITALE",
+                speed: 15, top: 10, left: 40, width: 55,
+                fontSize: '36px', fontWeight: '800', textAlign: 'right',
+                effect: 'shine-matrix-green',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 32,
+                content: "La paura di essere esclusi (FOMO).\nOre perse a scorrere video senza meta.\n\nLa tecnologia deve essere uno strumento, non una prigione.",
+                speed: 10, top: 30, left: 40, width: 55,
+                color: '#ccffcc', fontSize: '18px', textAlign: 'right', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '0 0 5px #003300'
+            },
+            // PAGINA 33: LO SCUDO (Shield Metal)
+            {
+                pageIndex: 33, content: "LO SCUDO",
+                speed: 15, top: 60, left: 10, width: 80,
+                fontSize: '42px', fontWeight: '800',
+                effect: 'shine-shield-metal',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 33,
+                content: "Parlane.\nSe vedi qualcosa di strano, dillo a un adulto o segnalalo alla piattaforma.\nNon affrontare i rischi da solo.",
+                speed: 10, top: 75, left: 10, width: 80,
+                color: '#e0f7fa', fontSize: '22px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+            },
+            // PAGINA 34: SINTESI RISCHI (Clean Red/White)
+            {
+                pageIndex: 34, content: "SINTESI: RISCHI",
+                speed: 15, top: 10, left: 10, width: 80,
+                color: '#FFFFFF', fontSize: '32px', fontWeight: 'bold',
+                fontFamily: "'Bebas Neue', sans-serif",
+                textShadow: '2px 2px 0px #ff0000'
+            },
+            {
+                pageIndex: 34,
+                content: "• Cyberbullismo: tolleranza zero.\n• Fake News: verifica sempre.\n• Phishing: occhio ai link.\n• Dipendenza: disconnettiti ogni tanto.",
+                speed: 10, top: 25, left: 10, width: 80,
+                color: '#fff', fontSize: '22px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif', textShadow: '1px 1px 1px #000'"
+            },
+            // PAGINA 35: SICUREZZA DIGITALE (Cyber Purple - Nuovo Capitolo)
+            {
+                pageIndex: 35, content: "SICUREZZA\nDIGITALE",
+                speed: 15, top: 3, left: 10, width: 80,
+                fontSize: '50px', fontWeight: '800', textAlign: 'center',
+                effect: 'shine-cyber-purple',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 35,
+                content: "Proteggi il tuo mondo virtuale.\nLe chiavi di casa non le daresti a nessuno, vero?",
+                speed: 10, top: 35, left: 5, width: 35,
+                color: '#e1bee7', fontSize: '22px', textAlign: 'left', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '0 0 10px rgba(123, 31, 162, 0.8)'
+            },
+            // PAGINA 36: PASSWORD ROBUSTE (Steel Lock)
+            {
+                pageIndex: 36, content: "PASSWORD ROBUSTE",
+                speed: 15, top: 10, left: 10, width: 90,
+                fontSize: '36px', fontWeight: '800',
+                effect: 'shine-steel-lock',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 36,
+                content: "No: 123456, password, iltuonome.\nSì: Frasi lunghe, numeri, simboli.\nUsa password diverse per ogni account!",
+                speed: 10, top: 25, left: 10, width: 80,
+                color: '#eceff1', fontSize: '20px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '1px 1px 2px #000'
+            },
+            // PAGINA 37: 2FA (Sync Blue)
+            {
+                pageIndex: 37, content: "2FA (DUE FATTORI)",
+                speed: 15, top: 10, left: 50, width: 45,
+                fontSize: '36px', fontWeight: '800', textAlign: 'right',
+                effect: 'shine-sync-blue',
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 37,
+                content: "Una doppia serratura per i tuoi account.\n1. Password (qualcosa che sai)\n2. Codice sul telefono (qualcosa che hai).",
+                speed: 10, top: 30, left: 40, width: 55,
+                color: '#b2dfdb', fontSize: '20px', textAlign: 'right', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif",
+                textShadow: '0 0 5px rgba(0, 150, 136, 0.8)'
+            },
+            // PAGINA 38: AGGIORNAMENTI (Clean Tech)
+            {
+                pageIndex: 38, content: "AGGIORNAMENTI",
+                speed: 15, top: 75, left: 10, width: 80,
+                fontSize: '38px', fontWeight: '800',
+                effect: 'shine-matrix-green', /* Riutilizzo effetto tech */
+                fontFamily: "'Bebas Neue', sans-serif"
+            },
+            {
+                pageIndex: 38,
+                content: "Non rimandarli!\nGli aggiornamenti chiudono le falle di sicurezza che gli hacker potrebbero usare.",
+                speed: 10, top: 85, left: 10, width: 90,
+                color: '#ccffcc', fontSize: '18px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif"
+            },
+            // PAGINA 39: SINTESI SICUREZZA
+            {
+                pageIndex: 39, content: "SINTESI: SICUREZZA",
+                speed: 15, top: 10, left: 10, width: 80,
+                color: '#FFFFFF', fontSize: '32px', fontWeight: 'bold',
+                fontFamily: "'Bebas Neue', sans-serif",
+                textShadow: '0 0 10px #7b1fa2'
+            },
+            {
+                pageIndex: 39,
+                content: "• Password complesse e uniche.\n• Attiva sempre la 2FA.\n• Aggiorna software e app.\n• Attento a dove clicchi.",
+                speed: 10, top: 25, left: 10, width: 80,
+                color: '#f3e5f5', fontSize: '22px', fontWeight: '500',
+                fontFamily: "'Open Sans', sans-serif"
+            },
+
+            // PAGINA 48 (FINE)
+            {
+                pageIndex: 48, content: "FINE",
+                speed: 25, top: 45, left: 0, width: 100, 
+                color: '#ffffff', fontSize: '60px', fontWeight: '800', textAlign: 'center'
+            },
+            {
+                pageIndex: 48, content: "IL CAMALEONTE 2025\nCittadinanza Digitale",
+                speed: 15, top: 60, left: 0, width: 100,
+                color: '#ffffff', fontSize: '20px', fontWeight: '500', textAlign: 'center'
+            }
+        ];
+
+        let typingTimeouts = [];
+
+        $(document).ready(function() {
+            const container = $('#flipbook');
+
+            const shineEffects = [
+                'shine-blue', 'shine-gold', 'shine-silver', 
+                'shine-red', 'shine-green', 'shine-purple'
+            ];
+
+            pages.forEach((file, index) => {
+                const pageNum = index + 1;
+                const div = document.createElement('div');
+                div.className = 'page';
+                
+                if (pageNum === 1 || pageNum === pages.length) {
+                    div.classList.add('hard');
+                }
+                
+                const bgDiv = document.createElement('div');
+                bgDiv.className = 'page-bg';
+                bgDiv.style.backgroundImage = "url('" + file + "')";
+
+                if (pageNum > 1 && pageNum <= 38) {
+                    bgDiv.style.backgroundSize = '100% 96%';
+                } else {
+                     bgDiv.style.backgroundSize = '100% 100%';
+                }
+                
+                if (pageNum === 4) {
+                    const curtain = document.createElement('div');
+                    curtain.className = 'curtain-base curtain-left';
+                    curtain.id = 'curtain-' + pageNum; 
+                    div.appendChild(curtain);
+                } else if (pageNum === 5) {
+                    const curtain = document.createElement('div');
+                    curtain.className = 'curtain-base curtain-right';
+                    curtain.id = 'curtain-' + pageNum; 
+                    div.appendChild(curtain);
+                }
+
+                if (pageNum <= 35) {
+                    bgDiv.classList.add('img-color-pulse');
+                }
+                
+                div.appendChild(bgDiv);
+                
+                const shadowDiv = document.createElement('div');
+                shadowDiv.className = 'gradient-shadow';
+                if (pageNum % 2 === 0) {
+                    shadowDiv.style.right = '0'; shadowDiv.style.left = 'auto'; 
+                    shadowDiv.style.background = 'linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.3))';
+                } else {
+                    shadowDiv.style.left = '0'; shadowDiv.style.right = 'auto'; 
+                    shadowDiv.style.background = 'linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0))';
+                }
+                div.appendChild(shadowDiv);
+
+                const currentChapter = chapters.find(c => pageNum >= c.start && pageNum <= c.end);
+                if (currentChapter) {
+                    const badge = document.createElement('div');
+                    badge.className = 'chapter-badge';
+                    badge.innerText = currentChapter.title;
+                    badge.style.backgroundColor = currentChapter.color; 
+                    div.appendChild(badge);
+                }
+
+                if (pageNum > 1 && pageNum < 48) {
+                    const pageNumDiv = document.createElement('div');
+                    pageNumDiv.className = 'page-number';
+                    pageNumDiv.innerText = pageNum;
+                    
+                    if (pageNum % 2 === 0) {
+                        pageNumDiv.style.left = '20px'; pageNumDiv.style.right = 'auto';
+                    } else {
+                        pageNumDiv.style.right = '20px'; pageNumDiv.style.left = 'auto';
+                    }
+                    div.appendChild(pageNumDiv);
+                }
+
+                const ls = links.filter(x => x.pageIndex === pageNum);
+                ls.forEach(l => {
+                    const a = document.createElement('div');
+                    a.className = 'hotspot'; 
+                    a.style.top = l.top+'%'; a.style.left = l.left+'%'; 
+                    a.style.width = l.width+'%'; a.style.height = l.height+'%';
+                    if (l.destPage) a.onclick = function() { $('#flipbook').turn('page', l.destPage); };
+                    else if (l.url) a.onclick = function() { window.open(l.url, '_blank'); };
+                    div.appendChild(a);
+                });
+
+                const pageTexts = texts.filter(x => x.pageIndex === pageNum);
+                pageTexts.forEach((txtConfig, i) => {
+                    const tDiv = document.createElement('div');
+                    
+                    if (txtConfig.htmlContent) {
+                        tDiv.className = 'static-content-box';
+                        tDiv.innerHTML = txtConfig.htmlContent;
+                    } else {
+                        tDiv.className = 'typewriter-box';
+                        tDiv.id = 'typewriter-' + pageNum + '-' + i;
+                        tDiv.setAttribute('data-content', txtConfig.content);
+                        tDiv.setAttribute('data-speed', txtConfig.speed);
+                    }
+                    
+                    tDiv.style.top = txtConfig.top + '%'; 
+                    tDiv.style.left = txtConfig.left + '%';
+                    tDiv.style.width = (txtConfig.width || 80) + '%'; 
+                    tDiv.style.height = txtConfig.height ? txtConfig.height + '%' : 'auto';
+                    tDiv.style.fontSize = txtConfig.fontSize;
+                    
+                    if (txtConfig.fontFamily) tDiv.style.fontFamily = txtConfig.fontFamily;
+                    if (txtConfig.fontStyle) tDiv.style.fontStyle = txtConfig.fontStyle;
+                    if (txtConfig.lineHeight) tDiv.style.lineHeight = txtConfig.lineHeight;
+                    
+                    if (txtConfig.textShadow) tDiv.style.textShadow = txtConfig.textShadow;
+                    
+                    if (!txtConfig.htmlContent) {
+                        const weight = txtConfig.fontWeight || '500'; 
+                        tDiv.style.fontWeight = weight;
+                        
+                        if (weight === '500') {
+                            tDiv.classList.add('shine-base');
+                            if (txtConfig.effect) {
+                                tDiv.classList.add(txtConfig.effect);
+                            } else {
+                                const effectIndex = pageNum % shineEffects.length;
+                                tDiv.classList.add(shineEffects[effectIndex]);
+                            }
+                        } else {
+                            tDiv.style.color = txtConfig.color; 
+                            if (txtConfig.effect) {
+                                if (txtConfig.effect.indexOf('shine') !== -1) {
+                                    tDiv.classList.add('shine-base');
+                                }
+                                tDiv.classList.add(txtConfig.effect);
+                                if (txtConfig.effect !== 'titolo-indice' && !txtConfig.textShadow) {
+                                    tDiv.style.textShadow = "2px 2px 0px #000, 4px 4px 5px rgba(0,0,0,0.5)";
+                                }
+                            } else {
+                                if (!txtConfig.textShadow) {
+                                    tDiv.style.textShadow = "2px 2px 0px #000, 3px 3px 0px #000, 4px 4px 0px #000, 5px 5px 0px #000, 5px 5px 10px rgba(0,0,0,0.8)";
+                                }
+                            }
+                        }
+                    }
+
+                    if(txtConfig.textAlign) tDiv.style.textAlign = txtConfig.textAlign;
+                    
+                    div.appendChild(tDiv);
+                });
+
+                container.append(div);
+            });
+
+            container.turn({
+                width: 960, height: 680, autoCenter: true, duration: 1000,
+                gradients: true, acceleration: true, elevation: 50,
+                cornerSize: 200
+            });
+            container.fadeIn();
+
+            function typeWriter(elementId, text, speed) {
+                let i = 0;
+                const element = document.getElementById(elementId);
+                if (!element) return;
+                element.innerHTML = '<span class="cursor"></span>'; 
+                function type() {
+                    if (i < text.length) {
+                        let char = text.charAt(i);
+                        if (char === '\n') {
+                            element.innerHTML = element.innerHTML.replace('<span class="cursor"></span>', '') + '<br>' + '<span class="cursor"></span>';
+                        } else {
+                            element.innerHTML = element.innerHTML.replace('<span class="cursor"></span>', '') + char + '<span class="cursor"></span>';
+                        }
+                        i++;
+                        let timer = setTimeout(type, speed);
+                        typingTimeouts.push(timer); 
+                    } else {
+                        element.innerHTML = element.innerHTML.replace('<span class="cursor"></span>', '');
+                    }
+                }
+                type();
+            }
+
+            container.bind("turned", function(event, page, view) {
+                typingTimeouts.forEach(t => clearTimeout(t));
+                typingTimeouts = [];
+                $('.typewriter-box').html('');
+                $('.curtain-base').removeClass('active');
+
+                view.forEach(pNum => {
+                    if (pNum === 0) return; 
+                    
+                    const curtain = document.getElementById('curtain-' + pNum);
+                    if (curtain) {
+                        void curtain.offsetWidth; 
+                        curtain.classList.add('active');
+                    }
+
+                    const boxes = document.querySelectorAll(`[id^="typewriter-${pNum}-"]`);
+                    boxes.forEach(box => {
+                        if (box.classList.contains('shine-base')) {
+                            box.classList.remove('shine-base');
+                            void box.offsetWidth; 
+                            box.classList.add('shine-base');
+                        }
+
+                        const content = box.getAttribute('data-content');
+                        const speed = box.getAttribute('data-speed');
+                        typeWriter(box.id, content, parseInt(speed));
+                    });
+                });
+
+                $('video').each(function() {
+                    const videoElement = this;
+                    const pageDiv = $(this).closest('.page');
+                    if (pageDiv.width() > 0 && $(this).width() > 0) {
+                        videoElement.currentTime = 0;
+                        videoElement.play().catch(e => {});
+                    } else {
+                        videoElement.pause();
+                        videoElement.currentTime = 0;
+                    }
+                });
+            });
+            
+            $(document).keydown(function(e){ 
+                if (e.keyCode == 37) container.turn("previous"); 
+                else if (e.keyCode == 39) container.turn("next"); 
+            });
+        });
+    </script>
+</body>
+</html>
