@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Rivista Interattiva</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,22 +19,43 @@
             background-color: #2e2e2e; 
             margin: 0; 
             height: 100vh; 
+            width: 100vw;
             display: flex; 
             justify-content: center; 
             align-items: center; 
-            overflow: hidden; 
+            overflow: hidden; /* Importante per evitare scrollbar durante lo zoom */
             font-family: 'Montserrat', sans-serif; 
+        }
+
+        /* WRAPPER PER LO ZOOM */
+        #zoom-wrapper {
+            width: 960px;
+            height: 680px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* La transizione gestisce lo zoom fluido durante il resize */
+            transition: transform 0.1s linear; 
         }
 
         #flipbook { 
             width: 960px; 
             height: 680px; 
-            display: none; 
+            /* Opacity invece di display:none per evitare glitch al caricamento */
+            opacity: 0; 
+            transition: opacity 1.5s ease-in-out;
+            visibility: visible; 
+        }
+
+        /* Classe per attivare la visibilità dopo l'init */
+        #flipbook.visible {
+            opacity: 1;
         }
 
         .page { 
             background-color: white; 
             position: relative; 
+            -webkit-font-smoothing: antialiased;
         }
 
         .hard { 
@@ -68,7 +89,7 @@
 
         .editorial-title {
             font-family: 'Playfair Display', serif;
-            font-size: 32px; /* Ridotto come richiesto */
+            font-size: 32px; 
             font-weight: 700;
             color: #2c3e50;
             margin: 0;
@@ -86,7 +107,7 @@
         .editorial-section-title {
             font-family: 'Bebas Neue', sans-serif;
             font-size: 18px;
-            color: #b30000; /* Rosso editoriale */
+            color: #b30000; 
             letter-spacing: 1px;
             margin-top: 15px;
             margin-bottom: 8px;
@@ -97,7 +118,7 @@
         /* Grid System per Fonti (Pg 48) */
         .source-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr; /* 2 colonne */
+            grid-template-columns: 1fr 1fr; 
             gap: 12px;
         }
 
@@ -169,7 +190,7 @@
         .sitography-item a:hover { color: #b30000; }
 
         .credits-section {
-            margin-top: auto; /* Spinge verso il basso */
+            margin-top: auto; 
             background: #f9f9f9;
             padding: 15px;
             border-top: 2px solid #333;
@@ -978,7 +999,10 @@
 </head>
 <body>
 
-    <div id="flipbook"></div>
+    <!-- WRAPPER AGGIUNTO PER ZOOM FLUIDO -->
+    <div id="zoom-wrapper">
+        <div id="flipbook"></div>
+    </div>
 
     <script>
         const pages = [];
@@ -1111,10 +1135,7 @@
                 destPage: 48
             },
 
-            // PAGINA 32: DIPENDENZA DIGITALE (Aumento contrasto e armonizzazione)
-            // PAGINA 32: DIPENDENZA DIGITALE - VERSIONE MASSIMO CONTRASTO
             // PAGINA 32: DIPENDENZA DIGITALE - VERSIONE CLEAN & HIGH-CONTRAST
-// PAGINA 32: DIPENDENZA DIGITALE - VERSIONE CLEAN & HIGH-CONTRAST
             // CORREZIONE PAGINA 32: Unione dei contenuti ed eliminazione sdoppiamenti
             {
             pageIndex: 32, 
@@ -1709,7 +1730,7 @@
                 // AUMENTO CONTRASTO: Bianco Puro + Grassetto
                 color: '#FFFFFF', 
                 fontSize: '22px', fontWeight: '700', // Aumentato peso (500 -> 700)
-                // Ombra nera molto marcata per staccare dal fondo
+                // Ombra nera molto marcata per stacco dal fondo
                 textShadow: '2px 2px 0 #000000, 0 0 5px rgba(0,0,0,0.9)'
             },
             // PAGINA 29: ODIO ONLINE (Dark Side Effect)
@@ -2232,12 +2253,20 @@
 
         $(document).ready(function() {
             const container = $('#flipbook');
+            const zoomWrapper = $('#zoom-wrapper'); // Riferimento al wrapper
+
+            // --- DEFINIZIONE AUDIO SICURA ---
+            // 1. Definiamo l'audio qui all'inizio dello script
+            // Se il file 'flip.mp3' non esiste, non succede nulla di grave
+            const flipSound = new Audio('flip.mp3');
+            flipSound.volume = 0.5;
 
             const shineEffects = [
                 'shine-blue', 'shine-gold', 'shine-silver', 
                 'shine-red', 'shine-green', 'shine-purple'
             ];
 
+            // 1. GENERAZIONE PAGINE
             pages.forEach((file, index) => {
                 const pageNum = index + 1;
                 const div = document.createElement('div');
@@ -2295,7 +2324,7 @@
                     div.appendChild(badge);
                 }
 
-                if (pageNum > 1 && pageNum < 50) { // MODIFICATO: Numerazione fino a pag 49
+                if (pageNum > 1 && pageNum < 50) { 
                     const pageNumDiv = document.createElement('div');
                     pageNumDiv.className = 'page-number';
                     pageNumDiv.innerText = pageNum;
@@ -2345,7 +2374,6 @@
                     
                     if (txtConfig.textShadow) tDiv.style.textShadow = txtConfig.textShadow;
                     
-                    // --- NUOVO: LOGICA PER GLI ELEMENTI INTERATTIVI DELL'INDICE (PAGINA 2) ---
                     if (txtConfig.pageIndex === 2 && txtConfig.destPage) {
                         tDiv.classList.add('interactive-index');
                         tDiv.onclick = function() { $('#flipbook').turn('page', txtConfig.destPage); };
@@ -2389,12 +2417,70 @@
                 container.append(div);
             });
 
+            // 2. FUNZIONE DI RESIZE INTELLIGENTE (ZOOM ENGINE)
+            function resizeFlipbook() {
+                // Dimensioni originali del flipbook
+                const bookWidth = 960;
+                const bookHeight = 680;
+                
+                // Dimensioni attuali della finestra
+                const winWidth = $(window).width();
+                const winHeight = $(window).height();
+
+                // Calcola il rapporto di scala necessario per adattarsi
+                // Lasciamo un po' di margine (0.9) per estetica
+                const scaleX = (winWidth * 0.95) / bookWidth;
+                const scaleY = (winHeight * 0.95) / bookHeight;
+                
+                // Prendi il valore minore per assicurarti che tutto sia visibile
+                let scale = Math.min(scaleX, scaleY);
+                
+                // Applica la trasformazione al wrapper
+                zoomWrapper.css({
+                    'transform': 'scale(' + scale + ')'
+                });
+            }
+
+            // 3. INIZIALIZZAZIONE TURN.JS CON EFFETTO SONORO
             container.turn({
-                width: 960, height: 680, autoCenter: true, duration: 1000,
-                gradients: true, acceleration: true, elevation: 50,
-                cornerSize: 200
+                width: 960, height: 680, 
+                autoCenter: true, 
+                duration: 1000,
+                gradients: true, 
+                acceleration: true, 
+                elevation: 50,
+                cornerSize: 200,
+                // Aggiunta evento per il suono
+                when: {
+                    turning: function(event, page, view) {
+                        // CONTROLLO DI SICUREZZA:
+                        // Se flipSound esiste (cioè è stato caricato), suonalo.
+                        if (typeof flipSound !== 'undefined') {
+                            try {
+                                flipSound.currentTime = 0;
+                                flipSound.play().catch(e => {}); // Ignora errori di autoplay
+                            } catch(err) {
+                                // Se c'è un errore imprevisto, non bloccare l'interfaccia
+                                console.log("Errore audio:", err);
+                            }
+                        }
+                    }
+                }
             });
-            container.fadeIn();
+
+            // 4. ATTIVAZIONE DELLA VISIBILITÀ (Transizione "Soft")
+            // Eseguiamo il resize subito per calcolare le dimensioni corrette
+            resizeFlipbook();
+            
+            // Piccola attesa per permettere al DOM di assestarsi, poi sveliamo
+            setTimeout(function() {
+                container.addClass('visible');
+            }, 100);
+
+            // 5. GESTIONE RESIZE FINESTRA
+            $(window).resize(function() {
+                resizeFlipbook();
+            });
 
             function typeWriter(elementId, text, speed) {
                 let i = 0;
